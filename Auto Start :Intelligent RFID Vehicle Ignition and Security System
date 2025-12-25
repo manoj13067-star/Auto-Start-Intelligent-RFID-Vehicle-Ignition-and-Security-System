@@ -1,0 +1,155 @@
+/* write an ECP AUTO START:Intelligent RFID Vehicle 
+Ignition and security system*/
+
+#include<lpc21xx.h>
+#include <string.h>
+#define MOTOR1 1<<10
+#define BUZZER 1<<11
+#define LCD_D 0xff
+#define RS 1<<14
+#define E 1<<15
+char valid_tag[] = "060067836E8C";
+char RFID_data[12];
+void UART1_INIT(void);
+char UART1_RxChar(void);
+void UART1_TxChar(char ch);
+void UART1_TxString(char *str);
+void delay_milliseconds(int ms);
+void motor_on(void);
+void motor_off(void);
+void buzzer_on(void);
+void buzzer_off(void);
+void LCD_INIT(void);
+void LCD_CMD(unsigned char);
+void LCD_DATA(unsigned char);
+void LCD_STR(unsigned char *);
+int main()
+{
+int i;
+
+PINSEL0|= 1<<16|1<<18; // Enable UART1 (P0.8, P0.9)
+IODIR0 |= MOTOR1 | BUZZER;
+LCD_INIT();
+UART1_INIT();
+IOSET0=BUZZER;
+IOCLR0=MOTOR1;
+UART1_TxString("RFID Vehicle Ignition System\r\n");
+while(1)
+{
+while(i<12) 
+{
+RFID_data[i++] = UART1_RxChar();
+}									    
+RFID_data[i] = '\0';
+i=0;
+ UART1_TxString( RFID_data);
+  LCD_CMD(0X80);
+  LCD_STR("Auto Start:RFID");
+  LCD_CMD(0XC0);
+  LCD_STR("Vehicle Ignition");
+  delay_milliseconds(250);
+  LCD_CMD(0X01);
+  LCD_CMD(0X80);
+  LCD_STR("User Id:v25ce2m2");
+ LCD_CMD(0Xc0);
+if(strcmp(RFID_data, valid_tag) == 0)
+{
+LCD_STR("MOTOR:ON");
+UART1_TxString("Access Granted\r\n");
+IOSET0=MOTOR1;
+IOSET0=BUZZER;
+
+}
+else
+{
+LCD_STR("MOTOR:OFF");
+UART1_TxString("Access Denied\r\n");
+IOCLR0=MOTOR1;
+IOCLR0=BUZZER;
+
+}
+}
+}
+
+void UART1_INIT(void)
+{
+U1LCR = 0x83; // 8-bit, 1 stop bit, DLAB = 1
+U1DLL = 97; // 9600 baud rate (15MHz crystal)
+U1DLM = 0;
+U1LCR = 0x03; // DLAB = 0
+}
+
+char UART1_RxChar(void)
+{
+  while((U1LSR&1)==0);
+ return U1RBR;
+}
+void UART1_TxChar(char ch)
+{
+U1THR = ch;
+while(((U1LSR>>5)&1)==0);
+}
+void UART1_TxString(char *str)
+{
+while(*str)
+{
+UART1_TxChar(*str++);
+}
+}
+void motor_on(void)	               
+{
+IOSET0 = MOTOR1;
+}
+void motor_off(void)
+{		  
+IOCLR0 = MOTOR1;
+}
+void buzzer_on(void)
+{
+IOSET0 = BUZZER;
+}
+void buzzer_off(void)
+{
+IOCLR0 = BUZZER;
+}
+void delay_milliseconds(int ms)
+{
+T0PR = 15000-1;
+T0TCR = 0x01;
+while(T0TC<ms);
+T0TCR = 0x03; 
+T0TCR = 0x00;
+}
+void LCD_INIT(void)
+{
+IODIR0|=LCD_D|RS|E;
+LCD_CMD(0x01);
+LCD_CMD(0x02);
+LCD_CMD(0x0c);
+LCD_CMD(0x38);
+}
+void LCD_STR(unsigned char *s)
+{
+ while(*s)
+{
+  LCD_DATA(*s++);
+}
+ }
+void LCD_CMD(unsigned char cmd)
+{
+IOCLR0=LCD_D;
+IOSET0=cmd;
+IOCLR0=RS;
+IOSET0=E;
+delay_milliseconds(2);
+IOCLR0=E;
+}
+void LCD_DATA(unsigned char d)
+{
+IOCLR0=LCD_D;
+IOSET0=d;
+IOSET0=RS;
+IOSET0=E;
+delay_milliseconds(2);
+IOCLR0=E;
+}
